@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -19,6 +20,10 @@ const (
 	defaultGeminiBaseURL = "https://generativelanguage.googleapis.com/v1beta/models"
 	xMaxWeight           = 280
 )
+
+// domainLikePattern matches domain-like strings (e.g. TheJournal.ie, met.ie)
+// that X would auto-linkify as URLs, without matching decimal numbers like 57.5.
+var domainLikePattern = regexp.MustCompile(`([A-Za-z0-9-])\.([A-Za-z]{2,})`)
 
 // Fetcher fetches latest Irish news via Gemini API with Google Search grounding
 // and returns standalone Japanese posts.
@@ -169,6 +174,7 @@ func splitPosts(raw string) []string {
 		text := strings.TrimSpace(strings.Join(current, "\n"))
 		current = nil
 		if text != "" {
+			text = defangDomains(text)
 			posts = append(posts, truncateToXLimit(text, xMaxWeight))
 		}
 	}
@@ -183,6 +189,18 @@ func splitPosts(raw string) []string {
 	flush()
 
 	return posts
+}
+
+// defangDomains inserts spaces around dots in domain-like strings (e.g.
+// "TheJournal.ie" -> "TheJournal . ie") so X does not auto-linkify them as URLs.
+func defangDomains(s string) string {
+	for {
+		replaced := domainLikePattern.ReplaceAllString(s, "$1 . $2")
+		if replaced == s {
+			return replaced
+		}
+		s = replaced
+	}
 }
 
 // truncateToXLimit trims text to fit within X's weighted character limit

@@ -69,3 +69,20 @@ func TestFetchAndTranslate_Success(t *testing.T) {
 		t.Fatalf("unexpected posts: %#v", got)
 	}
 }
+
+func TestDefangDomains(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"出典: TheJournal.ie", "出典: TheJournal . ie"},
+		{"出典: The Journal.ie", "出典: The Journal . ie"},
+		{"出典: www.met.ie", "出典: www . met . ie"},
+		{"気温は-1.5度、保有率は57.5%です。", "気温は-1.5度、保有率は57.5%です。"},
+	}
+	for _, tc := range cases {
+		if got := defangDomains(tc.in); got != tc.want {
+			t.Errorf("defangDomains(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
