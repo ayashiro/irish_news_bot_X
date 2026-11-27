@@ -64,23 +64,15 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	}
 
 	client := xclient.New(cfg)
-	tweetIDs := make([]string, 0, len(posts))
-	for i, text := range posts {
-		tweetID, err := client.PostTweet(ctx, text)
-		if err != nil {
-			return err
-		}
-		tweetIDs = append(tweetIDs, tweetID)
-		logger.Info("posted to X successfully",
-			"index", i+1,
-			"total", len(posts),
-			"tweet_id", tweetID,
-		)
+	tweetIDs, err := client.PostThread(ctx, posts)
+	if err != nil {
+		return err
 	}
 
-	logger.Info("job completed successfully",
+	logger.Info("posted thread to X successfully",
 		"count", len(tweetIDs),
 		"tweet_ids", tweetIDs,
 	)
+	logger.Info("job completed successfully")
 	return nil
 }
