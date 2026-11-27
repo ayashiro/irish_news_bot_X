@@ -6,7 +6,10 @@ import (
 	"strings"
 )
 
-const defaultGeminiModel = "gemini-4-hydrogen"
+const (
+	defaultGeminiModel = "gemini-4-hydrogen"
+	defaultPromptFile  = "prompts/news_prompt.txt"
+)
 
 // Config は Cloud Run Job の実行設定を保持する。
 type Config struct {
@@ -16,6 +19,7 @@ type Config struct {
 	XAccessTokenSecret string
 	GeminiAPIKey       string
 	GeminiModel        string
+	PromptFile         string
 	DryRun             bool
 	TaskIndex          string
 	ExecutionName      string
@@ -33,6 +37,7 @@ func Load() (Config, error) {
 		XAccessTokenSecret: strings.TrimSpace(os.Getenv("X_ACCESS_TOKEN_SECRET")),
 		GeminiAPIKey:       strings.TrimSpace(os.Getenv("GEMINI_API_KEY")),
 		GeminiModel:        envOrDefault("GEMINI_MODEL", defaultGeminiModel),
+		PromptFile:         envOrDefault("PROMPT_FILE", defaultPromptFile),
 		DryRun:             dryRun,
 		TaskIndex:          envOrDefault("CLOUD_RUN_TASK_INDEX", "0"),
 		ExecutionName:      envOrDefault("CLOUD_RUN_EXECUTION", "local"),

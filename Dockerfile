@@ -16,6 +16,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/job ./c
 
 FROM gcr.io/distroless/static-debian12:nonroot
 
-COPY --from=builder /out/job /job
+WORKDIR /app
 
-ENTRYPOINT ["/job"]
+COPY --from=builder /out/job /app/job
+COPY prompts/ /app/prompts/
+
+ENTRYPOINT ["/app/job"]

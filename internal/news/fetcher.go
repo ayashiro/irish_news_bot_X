@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -21,6 +22,7 @@ const defaultGeminiBaseURL = "https://generativelanguage.googleapis.com/v1beta/m
 type Fetcher struct {
 	apiKey     string
 	model      string
+	promptFile string
 	baseURL    string
 	httpClient *http.Client
 	nowFunc    func() time.Time
@@ -29,9 +31,10 @@ type Fetcher struct {
 // New は設定からニュース取得クライアントを生成する。
 func New(cfg config.Config) *Fetcher {
 	return &Fetcher{
-		apiKey:  cfg.GeminiAPIKey,
-		model:   cfg.GeminiModel,
-		baseURL: defaultGeminiBaseURL,
+		apiKey:     cfg.GeminiAPIKey,
+		model:      cfg.GeminiModel,
+		promptFile: cfg.PromptFile,
+		baseURL:    defaultGeminiBaseURL,
 		httpClient: &http.Client{
 			Timeout: 120 * time.Second,
 		},
@@ -75,17 +78,15 @@ type generateContentResponse struct {
 // FetchAndTranslate はアイルランドの最新ニュースを検索・要約し、
 // X 投稿用の日本語テキストを返す。
 func (f *Fetcher) FetchAndTranslate(ctx context.Context) (string, error) {
+	rawPrompt, err := os.ReadFile(f.promptFile)
+	if err != nil {
+		return "", fmt.Errorf("プロンプトファイル (%s) の読み込みに失敗しました: %w", f.promptFile, err)
+	}
 	today := f.nowFunc().UTC().Format("2006-01-02")
-	prompt := fmt.Sprintf(`Google 検索を使って、今日（%s）または直近24時間以内のアイルランドの最新ニュース（RTÉ News、The Irish Times、Irish Independent、TheJournal.ie などの主要メディア）を1件選んでください。
-
-選んだニュースを日本の読者向けに自然な日本語で要約し、そのまま X（旧Twitter）に投稿できるテキストを作成してください。
-
-厳守事項:
-- 全体を日本語の全角130文字以内に収めること（ハッシュタグ・出典名を含む）
-- 記事の要点をわかりやすく簡潔にまとめること
-- 末尾に出典メディア名（例: 出典: RTÉ News）とハッシュタグ（#アイルランド）を入れること
-- 「以下が要約です」などの前置き、引用符、Markdown記法（**や*など）、URLは一切出力しないこと
-- 投稿本文のみを出力すること`, today)
+	prompt := strings.ReplaceAll(strings.TrimSpace(string(rawPrompt)), "{{TODAY}}", today)
+	if prompt == "" {
+		return "", fmt.Errorf("プロンプトファイル (%s) が空です", f.promptFile)
+	}
 
 	reqBody := generateContentRequest{
 		Contents: []content{
