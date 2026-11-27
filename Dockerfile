@@ -4,9 +4,7 @@ FROM golang:1.25-alpine AS builder
 
 WORKDIR /src
 
-COPY go.mod ./
-# Use wildcard so go.sum is copied automatically once added
-COPY go.sum* ./
+COPY go.mod go.sum* ./
 RUN go mod download
 
 COPY cmd/ ./cmd/
