@@ -1,0 +1,42 @@
+substitutions:
+  _REGION: asia-northeast1
+  _JOB_NAME: x-ireland-news
+  _IMAGE: asia-northeast1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/x-ireland-news
+
+steps:
+  - id: "docker-build"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-t"
+      - "${_IMAGE}:${SHORT_SHA}"
+      - "-t"
+      - "${_IMAGE}:latest"
+      - "."
+
+  - id: "docker-push"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "--all-tags"
+      - "${_IMAGE}"
+
+  - id: "update-cloud-run-job"
+    name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
+    entrypoint: "gcloud"
+    args:
+      - "run"
+      - "jobs"
+      - "update"
+      - "${_JOB_NAME}"
+      - "--image=${_IMAGE}:${SHORT_SHA}"
+      - "--region=${_REGION}"
+      - "--project=${PROJECT_ID}"
+      - "--quiet"
+
+images:
+  - "${_IMAGE}:${SHORT_SHA}"
+  - "${_IMAGE}:latest"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
