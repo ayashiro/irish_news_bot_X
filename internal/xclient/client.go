@@ -23,7 +23,7 @@ import (
 
 const defaultTweetsEndpoint = "https://api.x.com/2/tweets"
 
-// Client posts tweets via X API v2 using OAuth 1.0a.
+// Client posts tweets and threads via X API v2 using OAuth 1.0a.
 type Client struct {
 	apiKey            string
 	apiKeySecret      string
@@ -51,8 +51,13 @@ func New(cfg config.Config) *Client {
 	}
 }
 
+type tweetReply struct {
+	InReplyToTweetID string `json:"in_reply_to_tweet_id"`
+}
+
 type createTweetRequest struct {
-	Text string `json:"text"`
+	Text  string      `json:"text"`
+	Reply *tweetReply `json:"reply,omitempty"`
 }
 
 type createTweetResponse struct {
@@ -62,14 +67,43 @@ type createTweetResponse struct {
 	} `json:"data"`
 }
 
-// PostTweet posts text to X and returns the created tweet ID.
+// PostTweet posts a single tweet to X and returns the created tweet ID.
 // When DryRun is true, it skips the API call and returns an empty string.
 func (c *Client) PostTweet(ctx context.Context, text string) (string, error) {
+	return c.post(ctx, text, "")
+}
+
+// PostThread posts multiple texts as a connected X thread by replying to each
+// previous tweet ID. When DryRun is true, it skips all API calls and returns nil.
+func (c *Client) PostThread(ctx context.Context, texts []string) ([]string, error) {
+	if c.dryRun || len(texts) == 0 {
+		return nil, nil
+	}
+
+	ids := make([]string, 0, len(texts))
+	var replyToID string
+	for i, text := range texts {
+		id, err := c.post(ctx, text, replyToID)
+		if err != nil {
+			return ids, fmt.Errorf("failed to post tweet %d/%d in thread: %w", i+1, len(texts), err)
+		}
+		ids = append(ids, id)
+		replyToID = id
+	}
+	return ids, nil
+}
+
+func (c *Client) post(ctx context.Context, text, inReplyToTweetID string) (string, error) {
 	if c.dryRun {
 		return "", nil
 	}
 
-	payload, err := json.Marshal(createTweetRequest{Text: text})
+	reqPayload := createTweetRequest{Text: text}
+	if inReplyToTweetID != "" {
+		reqPayload.Reply = &tweetReply{InReplyToTweetID: inReplyToTweetID}
+	}
+
+	payload, err := json.Marshal(reqPayload)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal tweet request JSON: %w", err)
 	}

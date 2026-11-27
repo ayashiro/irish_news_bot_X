@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"xapp/internal/config"
@@ -43,27 +42,37 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	)
 
 	fetcher := news.New(cfg)
-	postText, err := fetcher.FetchAndTranslate(ctx)
+	posts, err := fetcher.FetchAndTranslate(ctx)
 	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(postText) == "" {
+	if len(posts) == 0 {
 		logger.Info("no news to post")
 		return nil
 	}
 
+	if cfg.DryRun {
+		for i, text := range posts {
+			logger.Info("dry run enabled; skipped posting to X",
+				"index", i+1,
+				"total", len(posts),
+				"text", text,
+			)
+		}
+		logger.Info("job completed successfully")
+		return nil
+	}
+
 	client := xclient.New(cfg)
-	tweetID, err := client.PostTweet(ctx, postText)
+	tweetIDs, err := client.PostThread(ctx, posts)
 	if err != nil {
 		return err
 	}
 
-	if cfg.DryRun {
-		logger.Info("dry run enabled; skipped posting to X", "text", postText)
-	} else {
-		logger.Info("posted to X successfully", "tweet_id", tweetID, "text", postText)
-	}
-
+	logger.Info("posted thread to X successfully",
+		"count", len(tweetIDs),
+		"tweet_ids", tweetIDs,
+	)
 	logger.Info("job completed successfully")
 	return nil
 }

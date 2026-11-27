@@ -14,9 +14,9 @@ import (
 	"xapp/internal/config"
 )
 
-func TestFetchAndTranslate_Success(t *testing.T) {
+func TestFetchAndTranslate_ThreadSuccess(t *testing.T) {
 	promptPath := filepath.Join(t.TempDir(), "news_prompt.txt")
-	if err := os.WriteFile(promptPath, []byte("今日({{TODAY}})のアイルランドニュースを要約してください。"), 0o600); err != nil {
+	if err := os.WriteFile(promptPath, []byte("Summarize Ireland news for {{TODAY}}."), 0o600); err != nil {
 		t.Fatalf("failed to write prompt file: %v", err)
 	}
 
@@ -34,7 +34,7 @@ func TestFetchAndTranslate_Success(t *testing.T) {
 		_, _ = w.Write([]byte(`{
 			"candidates": [{
 				"content": {
-					"parts": [{"text": "ダブリン市内で新しい公共交通計画が発表されました。（出典: RTÉ News） #アイルランド"}]
+					"parts": [{"text": "1/3 ニュース1\n---\n2/3 ニュース2\n---\n3/3 ニュース3 #アイルランド"}]
 				}
 			}]
 		}`))
@@ -65,7 +65,10 @@ func TestFetchAndTranslate_Success(t *testing.T) {
 	if len(gotReq.Contents) != 1 || len(gotReq.Contents[0].Parts) != 1 || !strings.Contains(gotReq.Contents[0].Parts[0].Text, "2026-11-27") {
 		t.Fatalf("expected {{TODAY}} to be replaced in prompt: %+v", gotReq.Contents)
 	}
-	if !strings.Contains(got, "ダブリン") {
-		t.Fatalf("unexpected response text: %q", got)
+	if len(got) != 3 {
+		t.Fatalf("expected 3 posts, got %d: %#v", len(got), got)
+	}
+	if !strings.Contains(got[0], "1/3") || !strings.Contains(got[2], "3/3") {
+		t.Fatalf("unexpected split posts: %#v", got)
 	}
 }

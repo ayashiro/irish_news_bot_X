@@ -1,9 +1,10 @@
-# xapp (Cloud Run Job for X Bot - Go)
+# xapp (Cloud Run Job for Ireland News X Bot)
 
-アイルランドのニュースを取得・日本語訳して X へ自動投稿する **Go 製 Cloud Run Job** のひな形です。
-外部ライブラリなしの標準ライブラリ構成で、OAuth 1.0a 署名による X API v2 投稿と Cloud Logging 向け JSON ログ出力に対応しています。
+A Go-based Google Cloud Run Job that fetches the latest Irish news via Gemini API (Google Search grounding), summarizes and translates it into Japanese, and publishes it as a thread on X (formerly Twitter).
 
-## ディレクトリ構成
+Built with the Go standard library only (no external dependencies) and packaged into a minimal distroless container.
+
+## Directory Structure
 
 ```text
 .
@@ -11,65 +12,70 @@
 ├── .dockerignore
 ├── .env.example
 ├── .gitignore
+├── cloudbuild.yaml
 ├── go.mod
+├── prompts/
+│   └── news_prompt.txt          # Editable Gemini prompt template ({{TODAY}} placeholder)
 ├── cmd/
 │   └── job/
-│       └── main.go              # Cloud Run Job エントリポイント
+│       └── main.go              # Cloud Run Job entrypoint (JSON structured logging)
 └── internal/
     ├── config/
-    │   └── config.go            # 環境変数の読み込み・バリデーション
+    │   └── config.go            # Environment variable loading and validation
     ├── news/
-    │   └── fetcher.go           # ニュース取得・翻訳ロジック（ここを実装）
+    │   ├── fetcher.go           # Gemini API client with Google Search grounding
+    │   └── fetcher_test.go      # Unit tests
     └── xclient/
-        ├── client.go            # X API v2 投稿クライアント (OAuth 1.0a)
-        └── client_test.go       # ユニットテスト
+        ├── client.go            # X API v2 OAuth 1.0a client (single tweet & thread)
+        └── client_test.go       # Unit tests
 ```
 
-## ローカルでの動作確認（WSL）
+## Configuration
+
+| Environment Variable | Required | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `GEMINI_API_KEY` | Yes | - | Gemini API key |
+| `GEMINI_MODEL` | No | `gemini-4-hydrogen` | Gemini model ID |
+| `PROMPT_FILE` | No | `prompts/news_prompt.txt` | Path to prompt template file |
+| `X_API_KEY` | When `DRY_RUN=false` | - | X API Key (OAuth 1.0a Consumer Key) |
+| `X_API_KEY_SECRET` | When `DRY_RUN=false` | - | X API Key Secret (OAuth 1.0a Consumer Secret) |
+| `X_ACCESS_TOKEN` | When `DRY_RUN=false` | - | X Access Token (Read and write) |
+| `X_ACCESS_TOKEN_SECRET` | When `DRY_RUN=false` | - | X Access Token Secret |
+| `DRY_RUN` | No | `false` | Set to `true` to fetch news without posting to X |
+
+## Local Development
 
 ```bash
-cd /home/kenta/xapp
+# Run unit tests
+go test -v ./...
 
-# テスト実行
-go test ./...
-
-# DRY_RUN=true でローカル実行（X には投稿されません）
-DRY_RUN=true go run ./cmd/job
-```
-
-実際に X へテスト投稿する場合は、`.env.example` を参考に `.env` を作成して環境変数を読み込んで実行します。
-
-```bash
+# Copy and fill in environment variables
 cp .env.example .env
-# .env に 4 つの X API キーを設定し、DRY_RUN=false に変更
 set -a && source .env && set +a
-go run ./cmd/job
+
+# Dry run (fetches news via Gemini without posting to X)
+DRY_RUN=true go run ./cmd/job
+
+# Live run (posts thread to X)
+DRY_RUN=false go run ./cmd/job
 ```
 
-## Cloud Run Job へのデプロイ
+## Prompt Customization
 
-X のキーは **Secret Manager** に登録し、`--set-secrets` で環境変数として渡す構成を推奨します。
+Edit `prompts/news_prompt.txt` to customize the tone, number of news items, or hashtags.
+- `{{TODAY}}` is replaced at runtime with the current UTC date (`YYYY-MM-DD`).
+- Separate multiple posts with a line containing only `---`; each section is posted sequentially as a reply to the previous tweet to form a thread.
 
-```bash
-gcloud run jobs deploy ireland-news-bot \
-  --source=. \
-  --region=asia-northeast1 \
-  --project=<PROJECT_ID> \
-  --max-retries=1 \
-  --task-timeout=5m \
-  --set-env-vars=DRY_RUN=false \
-  --set-secrets=X_API_KEY=x-api-key:latest,X_API_KEY_SECRET=x-api-key-secret:latest,X_ACCESS_TOKEN=x-access-token:latest,X_ACCESS_TOKEN_SECRET=x-access-token-secret:latest,GEMINI_API_KEY=gemini-api-key:latest \
-  --quiet
-```
+## Deployment (Cloud Run Job & Cloud Build)
 
-## 手動実行テスト
+Pushing to `main` triggers `cloudbuild.yaml`, which builds the container image, pushes it to Artifact Registry, and updates the `x-ireland-news` Cloud Run Job.
+
+To run the deployed job manually:
 
 ```bash
-gcloud run jobs execute ireland-news-bot \
+gcloud run jobs execute x-ireland-news \
   --region=asia-northeast1 \
   --project=<PROJECT_ID> \
   --wait \
   --quiet
 ```
-
-定期実行したい場合は、Cloud Run Jobs の画面または Cloud Scheduler からスケジュールトリガーを設定できます。
