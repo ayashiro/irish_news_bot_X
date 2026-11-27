@@ -1,6 +1,6 @@
 # xapp (Cloud Run Job for Ireland News X Bot)
 
-A Go-based Google Cloud Run Job that fetches the latest Irish news via Gemini API (Google Search grounding), summarizes and translates it into Japanese, and publishes it as a thread on X (formerly Twitter).
+A Go-based Google Cloud Run Job that fetches the latest Irish news via Gemini API (Google Search grounding), summarizes and translates it into Japanese, resolves source article URLs from grounding metadata, and publishes each item as a standalone post on X (formerly Twitter).
 
 Built with the Go standard library only (no external dependencies) and packaged into a minimal distroless container.
 
@@ -64,7 +64,7 @@ DRY_RUN=false go run ./cmd/job
 
 Edit `prompts/news_prompt.txt` to customize the tone, number of news items, or hashtags.
 - `{{TODAY}}` is replaced at runtime with the current UTC date (`YYYY-MM-DD`).
-- Separate multiple posts with a line containing only `---`; each section is posted sequentially as a reply to the previous tweet to form a thread.
+- Separate multiple posts with a line containing only `---`; each section is posted independently on X with its resolved grounding source URL appended.
 
 ## Deployment (Cloud Run Job & Cloud Build)
 
