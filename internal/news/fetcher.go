@@ -41,7 +41,7 @@ func New(cfg config.Config) *Fetcher {
 		promptFile: cfg.PromptFile,
 		baseURL:    defaultGeminiBaseURL,
 		httpClient: &http.Client{
-			Timeout: 120 * time.Second,
+			Timeout: 240 * time.Second,
 		},
 		redirectClient: &http.Client{
 			Timeout: 8 * time.Second,
