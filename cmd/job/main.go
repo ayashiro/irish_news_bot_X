@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+	_ "time/tzdata"
 
 	"xapp/internal/config"
 	"xapp/internal/news"
@@ -39,7 +42,20 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		"task_index", cfg.TaskIndex,
 		"gemini_model", cfg.GeminiModel,
 		"dry_run", cfg.DryRun,
+		"stop_after_date", cfg.StopAfterDate,
 	)
+
+	expired, err := isPastStopDate(time.Now(), cfg.StopAfterDate, cfg.Timezone)
+	if err != nil {
+		return err
+	}
+	if expired {
+		logger.Info("past stop_after_date; skipping execution",
+			"stop_after_date", cfg.StopAfterDate,
+			"timezone", cfg.Timezone,
+		)
+		return nil
+	}
 
 	fetcher := news.New(cfg)
 	posts, err := fetcher.FetchAndTranslate(ctx)
@@ -83,4 +99,21 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		"tweet_ids", tweetIDs,
 	)
 	return nil
+}
+
+// isPastStopDate returns true when now's local date in tzName is strictly after
+// stopAfterDate (YYYY-MM-DD). An empty stopAfterDate disables the cutoff.
+func isPastStopDate(now time.Time, stopAfterDate, tzName string) (bool, error) {
+	if stopAfterDate == "" {
+		return false, nil
+	}
+	if _, err := time.Parse("2006-01-02", stopAfterDate); err != nil {
+		return false, fmt.Errorf("invalid STOP_AFTER_DATE (%q), expected YYYY-MM-DD: %w", stopAfterDate, err)
+	}
+	loc, err := time.LoadLocation(tzName)
+	if err != nil {
+		return false, fmt.Errorf("invalid TIMEZONE (%q): %w", tzName, err)
+	}
+	today := now.In(loc).Format("2006-01-02")
+	return today > stopAfterDate, nil
 }

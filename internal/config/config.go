@@ -9,6 +9,7 @@ import (
 const (
 	defaultGeminiModel = "gemini-4-hydrogen"
 	defaultPromptFile  = "prompts/news_prompt.txt"
+	defaultTimezone    = "Europe/Dublin"
 )
 
 // Config holds runtime configuration for the Cloud Run Job.
@@ -20,6 +21,8 @@ type Config struct {
 	GeminiAPIKey       string
 	GeminiModel        string
 	PromptFile         string
+	Timezone           string
+	StopAfterDate      string
 	DryRun             bool
 	TaskIndex          string
 	ExecutionName      string
@@ -38,6 +41,8 @@ func Load() (Config, error) {
 		GeminiAPIKey:       strings.TrimSpace(os.Getenv("GEMINI_API_KEY")),
 		GeminiModel:        envOrDefault("GEMINI_MODEL", defaultGeminiModel),
 		PromptFile:         envOrDefault("PROMPT_FILE", defaultPromptFile),
+		Timezone:           envOrDefault("TIMEZONE", defaultTimezone),
+		StopAfterDate:      strings.TrimSpace(os.Getenv("STOP_AFTER_DATE")),
 		DryRun:             dryRun,
 		TaskIndex:          envOrDefault("CLOUD_RUN_TASK_INDEX", "0"),
 		ExecutionName:      envOrDefault("CLOUD_RUN_EXECUTION", "local"),

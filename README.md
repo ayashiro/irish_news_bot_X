@@ -37,6 +37,8 @@ Built with the Go standard library only (no external dependencies) and packaged 
 | `GEMINI_API_KEY` | Yes | - | Gemini API key |
 | `GEMINI_MODEL` | No | `gemini-4-hydrogen` | Gemini model ID |
 | `PROMPT_FILE` | No | `prompts/news_prompt.txt` | Path to prompt template file |
+| `TIMEZONE` | No | `Europe/Dublin` | Timezone used to evaluate `STOP_AFTER_DATE` |
+| `STOP_AFTER_DATE` | No | - | Optional last run date (`YYYY-MM-DD`); skips execution after this date |
 | `X_API_KEY` | When `DRY_RUN=false` | - | X API Key (OAuth 1.0a Consumer Key) |
 | `X_API_KEY_SECRET` | When `DRY_RUN=false` | - | X API Key Secret (OAuth 1.0a Consumer Secret) |
 | `X_ACCESS_TOKEN` | When `DRY_RUN=false` | - | X Access Token (Read and write) |
