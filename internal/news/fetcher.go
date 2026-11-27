@@ -17,8 +17,8 @@ import (
 
 const defaultGeminiBaseURL = "https://generativelanguage.googleapis.com/v1beta/models"
 
-// Fetcher は Gemini API（Google 検索グラウンディング）を使って
-// アイルランドの最新ニュースを取得し、日本語の投稿文を生成する。
+// Fetcher fetches latest Irish news via Gemini API with Google Search grounding
+// and returns a Japanese post text.
 type Fetcher struct {
 	apiKey     string
 	model      string
@@ -28,7 +28,7 @@ type Fetcher struct {
 	nowFunc    func() time.Time
 }
 
-// New は設定からニュース取得クライアントを生成する。
+// New creates a new news Fetcher from configuration.
 func New(cfg config.Config) *Fetcher {
 	return &Fetcher{
 		apiKey:     cfg.GeminiAPIKey,
@@ -75,17 +75,16 @@ type generateContentResponse struct {
 	} `json:"candidates"`
 }
 
-// FetchAndTranslate はアイルランドの最新ニュースを検索・要約し、
-// X 投稿用の日本語テキストを返す。
+// FetchAndTranslate searches for the latest Irish news and returns a Japanese summary for X.
 func (f *Fetcher) FetchAndTranslate(ctx context.Context) (string, error) {
 	rawPrompt, err := os.ReadFile(f.promptFile)
 	if err != nil {
-		return "", fmt.Errorf("プロンプトファイル (%s) の読み込みに失敗しました: %w", f.promptFile, err)
+		return "", fmt.Errorf("failed to read prompt file (%s): %w", f.promptFile, err)
 	}
 	today := f.nowFunc().UTC().Format("2006-01-02")
 	prompt := strings.ReplaceAll(strings.TrimSpace(string(rawPrompt)), "{{TODAY}}", today)
 	if prompt == "" {
-		return "", fmt.Errorf("プロンプトファイル (%s) が空です", f.promptFile)
+		return "", fmt.Errorf("prompt file (%s) is empty", f.promptFile)
 	}
 
 	reqBody := generateContentRequest{
@@ -105,39 +104,39 @@ func (f *Fetcher) FetchAndTranslate(ctx context.Context) (string, error) {
 
 	payload, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", fmt.Errorf("Gemini リクエスト JSON の生成に失敗しました: %w", err)
+		return "", fmt.Errorf("failed to marshal Gemini request JSON: %w", err)
 	}
 
 	endpoint := fmt.Sprintf("%s/%s:generateContent", strings.TrimRight(f.baseURL, "/"), f.model)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
-		return "", fmt.Errorf("Gemini HTTP リクエストの作成に失敗しました: %w", err)
+		return "", fmt.Errorf("failed to create Gemini HTTP request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-goog-api-key", f.apiKey)
 
 	resp, err := f.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("Gemini API へのリクエストに失敗しました: %w", err)
+		return "", fmt.Errorf("failed to call Gemini API: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("Gemini レスポンスの読み込みに失敗しました: %w", err)
+		return "", fmt.Errorf("failed to read Gemini response body: %w", err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("Gemini API がエラーを返しました (status=%d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return "", fmt.Errorf("Gemini API returned error (status=%d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var parsed generateContentResponse
 	if err := json.Unmarshal(body, &parsed); err != nil {
-		return "", fmt.Errorf("Gemini レスポンス JSON の解析に失敗しました: %w", err)
+		return "", fmt.Errorf("failed to decode Gemini response JSON: %w", err)
 	}
 
 	if len(parsed.Candidates) == 0 || len(parsed.Candidates[0].Content.Parts) == 0 {
-		return "", fmt.Errorf("Gemini から有効なテキストが返されませんでした")
+		return "", fmt.Errorf("Gemini API returned no candidate text")
 	}
 
 	var b strings.Builder
@@ -147,14 +146,14 @@ func (f *Fetcher) FetchAndTranslate(ctx context.Context) (string, error) {
 
 	text := strings.TrimSpace(b.String())
 	if text == "" {
-		return "", fmt.Errorf("Gemini から空のテキストが返されませんでした")
+		return "", fmt.Errorf("Gemini API returned empty text")
 	}
 
 	return truncateToXLimit(text, 280), nil
 }
 
-// truncateToXLimit は X の文字数ウェイト（ASCII は 1、日本語などの非 ASCII は 2）で
-// maxWeight 以内に安全に収める。
+// truncateToXLimit trims text to fit within X's weighted character limit
+// (1 for ASCII, 2 for non-ASCII characters).
 func truncateToXLimit(s string, maxWeight int) string {
 	weight := 0
 	for i, r := range s {
@@ -163,7 +162,6 @@ func truncateToXLimit(s string, maxWeight int) string {
 			w = 1
 		}
 		if weight+w > maxWeight {
-			// 末尾に「…」を付ける余裕を残して切り詰める
 			return strings.TrimSpace(s[:i])
 		}
 		weight += w

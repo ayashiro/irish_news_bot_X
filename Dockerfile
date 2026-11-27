@@ -5,7 +5,7 @@ FROM golang:1.25-alpine AS builder
 WORKDIR /src
 
 COPY go.mod ./
-# go.sum が追加されたら自動でコピーされるようワイルドカードを使用
+# Use wildcard so go.sum is copied automatically once added
 COPY go.sum* ./
 RUN go mod download
 

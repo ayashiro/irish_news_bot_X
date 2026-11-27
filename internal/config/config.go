@@ -11,7 +11,7 @@ const (
 	defaultPromptFile  = "prompts/news_prompt.txt"
 )
 
-// Config は Cloud Run Job の実行設定を保持する。
+// Config holds runtime configuration for the Cloud Run Job.
 type Config struct {
 	XAPIKey            string
 	XAPIKeySecret      string
@@ -25,7 +25,7 @@ type Config struct {
 	ExecutionName      string
 }
 
-// Load は環境変数から設定を読み込み、必須項目を検証する。
+// Load reads configuration from environment variables and validates required fields.
 func Load() (Config, error) {
 	dryRunVal := strings.ToLower(strings.TrimSpace(os.Getenv("DRY_RUN")))
 	dryRun := dryRunVal == "1" || dryRunVal == "true" || dryRunVal == "yes"
@@ -65,7 +65,7 @@ func Load() (Config, error) {
 	}
 
 	if len(missing) > 0 {
-		return Config{}, fmt.Errorf("必須の環境変数が設定されていません: %s", strings.Join(missing, ", "))
+		return Config{}, fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
 	}
 
 	return cfg, nil

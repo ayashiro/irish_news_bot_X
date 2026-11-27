@@ -23,7 +23,7 @@ import (
 
 const defaultTweetsEndpoint = "https://api.x.com/2/tweets"
 
-// Client は X API v2 を使って投稿を行うクライアント（OAuth 1.0a）。
+// Client posts tweets via X API v2 using OAuth 1.0a.
 type Client struct {
 	apiKey            string
 	apiKeySecret      string
@@ -35,7 +35,7 @@ type Client struct {
 	nowFunc           func() time.Time
 }
 
-// New は設定から X API クライアントを生成する。
+// New creates a new X API client from configuration.
 func New(cfg config.Config) *Client {
 	return &Client{
 		apiKey:            cfg.XAPIKey,
@@ -62,8 +62,8 @@ type createTweetResponse struct {
 	} `json:"data"`
 }
 
-// PostTweet はテキストを X に投稿し、成功時はツイート ID を返す。
-// DryRun が true の場合は実際には投稿せず空文字を返す。
+// PostTweet posts text to X and returns the created tweet ID.
+// When DryRun is true, it skips the API call and returns an empty string.
 func (c *Client) PostTweet(ctx context.Context, text string) (string, error) {
 	if c.dryRun {
 		return "", nil
@@ -71,17 +71,17 @@ func (c *Client) PostTweet(ctx context.Context, text string) (string, error) {
 
 	payload, err := json.Marshal(createTweetRequest{Text: text})
 	if err != nil {
-		return "", fmt.Errorf("リクエスト JSON の生成に失敗しました: %w", err)
+		return "", fmt.Errorf("failed to marshal tweet request JSON: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(payload))
 	if err != nil {
-		return "", fmt.Errorf("HTTP リクエストの作成に失敗しました: %w", err)
+		return "", fmt.Errorf("failed to create X API HTTP request: %w", err)
 	}
 
 	authHeader, err := c.buildOAuthHeader(http.MethodPost, c.endpoint)
 	if err != nil {
-		return "", fmt.Errorf("OAuth 署名の生成に失敗しました: %w", err)
+		return "", fmt.Errorf("failed to generate OAuth signature: %w", err)
 	}
 
 	req.Header.Set("Authorization", authHeader)
@@ -89,22 +89,22 @@ func (c *Client) PostTweet(ctx context.Context, text string) (string, error) {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("X API へのリクエストに失敗しました: %w", err)
+		return "", fmt.Errorf("failed to call X API: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("レスポンスの読み込みに失敗しました: %w", err)
+		return "", fmt.Errorf("failed to read X API response body: %w", err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("X API がエラーを返しました (status=%d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return "", fmt.Errorf("X API returned error (status=%d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var parsed createTweetResponse
 	if err := json.Unmarshal(body, &parsed); err != nil {
-		return "", fmt.Errorf("レスポンス JSON の解析に失敗しました: %w", err)
+		return "", fmt.Errorf("failed to decode X API response JSON: %w", err)
 	}
 
 	return parsed.Data.ID, nil
@@ -132,8 +132,8 @@ func (c *Client) buildOAuthHeader(method, rawURL string) (string, error) {
 	}
 	baseURL := parsedURL.Scheme + "://" + parsedURL.Host + parsedURL.Path
 
-	// RFC 5849 に従い、クエリパラメータと oauth_* パラメータを結合して署名ベース文字列を作る
-	// （Content-Type: application/json のリクエストボディは署名対象に含めない）
+	// Per RFC 5849, combine query parameters and oauth_* parameters for the signature base string.
+	// JSON request bodies (Content-Type: application/json) are excluded from the signature.
 	type kv struct{ k, v string }
 	var pairs []kv
 	for k, v := range oauthParams {
@@ -189,7 +189,7 @@ func generateNonce() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// percentEncode は RFC 3986 / RFC 5849 準拠のパーセントエンコードを行う。
+// percentEncode applies RFC 3986 / RFC 5849 percent-encoding.
 func percentEncode(s string) string {
 	var b strings.Builder
 	for i := 0; i < len(s); i++ {

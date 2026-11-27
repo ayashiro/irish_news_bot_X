@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	// Cloud Logging で構造化ログとして扱える JSON ハンドラを使用
+	// Use JSON handler for structured logs in Cloud Logging.
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
@@ -24,7 +24,7 @@ func main() {
 	defer stop()
 
 	if err := run(ctx, logger); err != nil {
-		logger.Error("ジョブ実行中にエラーが発生しました", "error", err)
+		logger.Error("job execution failed", "error", err)
 		os.Exit(1)
 	}
 }
@@ -35,7 +35,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return err
 	}
 
-	logger.Info("ジョブを開始します",
+	logger.Info("starting job",
 		"execution", cfg.ExecutionName,
 		"task_index", cfg.TaskIndex,
 		"gemini_model", cfg.GeminiModel,
@@ -48,7 +48,7 @@ func run(ctx context.Context, logger *slog.Logger) error {
 		return err
 	}
 	if strings.TrimSpace(postText) == "" {
-		logger.Info("投稿対象のニュースがありませんでした")
+		logger.Info("no news to post")
 		return nil
 	}
 
@@ -59,11 +59,11 @@ func run(ctx context.Context, logger *slog.Logger) error {
 	}
 
 	if cfg.DryRun {
-		logger.Info("[DRY_RUN] 投稿をスキップしました", "text", postText)
+		logger.Info("dry run enabled; skipped posting to X", "text", postText)
 	} else {
-		logger.Info("X への投稿に成功しました", "tweet_id", tweetID, "text", postText)
+		logger.Info("posted to X successfully", "tweet_id", tweetID, "text", postText)
 	}
 
-	logger.Info("ジョブが正常に完了しました")
+	logger.Info("job completed successfully")
 	return nil
 }
